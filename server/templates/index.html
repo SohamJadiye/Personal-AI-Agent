@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Personal Voice Assistant</title>
+<style>
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #e0f7fa;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+.container {
+    text-align: center;
+    background: white;
+    padding: 50px;
+    border-radius: 20px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+button {
+    padding: 15px 30px;
+    font-size: 18px;
+    border: none;
+    border-radius: 10px;
+    background-color: #81d4fa;
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+button:hover { background-color: #4fc3f7; }
+#status { margin-top: 20px; font-weight: bold; }
+#response { margin-top: 20px; font-size: 20px; color: #00796b; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Personal Voice Assistant</h1>
+    <button id="recordBtn">Start Recording</button>
+    <p id="status"></p>
+    <p id="response"></p>
+</div>
+
+<script>
+let recordBtn = document.getElementById("recordBtn");
+let statusText = document.getElementById("status");
+let responseText = document.getElementById("response");
+let audioBlob = null;
+let recognizedText = "";
+let mediaRecorder;
+let audioChunks = [];
+
+recordBtn.addEventListener("click", async () => {
+    if (!mediaRecorder || mediaRecorder.state === "inactive") {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+
+        mediaRecorder.onstop = async () => {
+            audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            console.log("Audio recorded:", audioBlob);
+
+
+            const formData = new FormData();
+            formData.append('audio_data', audioBlob, 'record.webm');
+
+            try {
+                const response = await fetch('/recognize', { method: 'POST', body: formData });
+                recognizedText = await response.text();
+                console.log("Recognized Text:", recognizedText);
+
+
+                responseText.innerText = recognizedText;
+
+                const utterance = new SpeechSynthesisUtterance(recognizedText);
+                utterance.lang = "en-US";
+                utterance.rate = 1;  
+                utterance.pitch = 1;  
+                speechSynthesis.speak(utterance);
+
+            } catch (err) {
+                console.error("Error recognizing audio:", err);
+                responseText.innerText = "Error recognizing speech.";
+            }
+
+            statusText.innerText = "Recording stopped.";
+            recordBtn.innerText = "Start Recording";
+        };
+
+        mediaRecorder.start();
+        recordBtn.innerText = "Stop Recording";
+        statusText.innerText = "Recording...";
+
+        setTimeout(() => {
+            if (mediaRecorder.state === "recording") mediaRecorder.stop();
+        }, 10000);
+
+    } else {
+        mediaRecorder.stop();
+        recordBtn.innerText = "Start Recording";
+        statusText.innerText = "";
+    }
+});
+</script>
+</body>
+</html>
